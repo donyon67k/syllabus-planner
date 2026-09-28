@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import CourseForm from '@/components/CourseForm'
 import type { Course } from '@/lib/types'
+import Link from 'next/link'
 
 export default function CoursesPage() {
   const supabase = createClient()
@@ -28,12 +29,13 @@ export default function CoursesPage() {
   return (
     <main className="mx-auto max-w-xl space-y-6 p-6">
       <h1 className="text-2xl font-semibold">My Courses</h1>
+            <Link href="/week" className="text-sm text-blue-400">View this week →</Link>
       <ul className="space-y-2">
         {courses.map((c) => (
           <li key={c.id} className="flex items-center gap-3 rounded border border-gray-700 p-3">
             <span className="h-4 w-4 rounded-full" style={{ background: c.color }} />
             <div className="flex-1">
-              <p className="font-medium">{c.name} {c.code && <span className="text-gray-400">· {c.code}</span>}</p>
+              <Link href={`/courses/${c.id}`} className="font-medium hover:underline">{c.name} {c.code && <span className="text-gray-400">· {c.code}</span>}</Link>
               <p className="text-xs text-gray-400">
                 {c.schedule_mode === 'week' ? `By week · starts ${c.term_start}` : 'By date'}
               </p>
