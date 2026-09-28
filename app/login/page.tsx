@@ -20,7 +20,7 @@ export default function LoginPage() {
         : await supabase.auth.signUp({ email, password })
     setLoading(false)
     if (error) return setMessage(error.message)
-    router.push('/test')
+        router.push('/courses')
   }
 
   return (
