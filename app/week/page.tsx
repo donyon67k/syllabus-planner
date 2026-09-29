@@ -44,7 +44,10 @@ export default function WeekPage() {
         <h1 className="text-xl font-semibold">Week of {formatDay(weekStart)}</h1>
         <button className="px-3 py-1 text-xl" onClick={() => setWeekStart(addDays(weekStart, 7))}>→</button>
       </div>
-      <Link href="/courses" className="text-sm text-gray-400">Manage courses →</Link>
+      <div className="flex gap-4 text-sm text-gray-400">
+        <Link href="/courses">Manage courses →</Link>
+        <Link href="/settings">Settings →</Link>
+      </div>
 
       {days.map((day) => {
         const due = dated.filter((x) => x.key === toISO(day))

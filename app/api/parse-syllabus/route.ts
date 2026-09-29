@@ -1,26 +1,26 @@
-import { GoogleGenAI, Type } from '@google/genai'
 import { NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+const MODEL = 'gemini-3.8-flash'
+const URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
 // The exact JSON shape we want back
 const schema = {
-  type: Type.OBJECT,
+  type: 'OBJECT',
   properties: {
     items: {
-      type: Type.ARRAY,
+      type: 'ARRAY',
       items: {
-        type: Type.OBJECT,
+        type: 'OBJECT',
         properties: {
-          title: { type: Type.STRING },
+          title: { type: 'STRING' },
           type: {
-            type: Type.STRING,
+            type: 'STRING',
             enum: ['assignment', 'reading', 'exam', 'quiz', 'project', 'other'],
           },
-          week: { type: Type.INTEGER },
-          weekday: { type: Type.INTEGER },
-          due_date: { type: Type.STRING },
+          week: { type: 'INTEGER' },
+          weekday: { type: 'INTEGER' },
+          due_date: { type: 'STRING' },
         },
         required: ['title', 'type'],
       },
@@ -28,6 +28,26 @@ const schema = {
   },
   required: ['items'],
 }
+// Try up to 3 times if Google is busy (503) or rate-limiting (429)
+async function callGemini(body: unknown) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const res = await fetch(URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY!,
+      },
+      body: JSON.stringify(body),
+    })
+    const json = await res.json()
+    if (res.ok) return { ok: true, json }
+    const busy = res.status === 503 || res.status === 429
+    if (!busy || attempt === 3) return { ok: false, json }
+    await new Promise((r) => setTimeout(r, attempt * 4000)) // wait 4s, then 8s
+  }
+  throw new Error('unreachable')
+}
+
 export async function POST(req: Request) {
   const supabase = await createServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
@@ -39,8 +59,6 @@ export async function POST(req: Request) {
   if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 })
   if (file.type !== 'application/pdf')
     return NextResponse.json({ error: 'PDF files only for now' }, { status: 400 })
-  if (file.size > 10 * 1024 * 1024)
-    return NextResponse.json({ error: 'File is over 10 MB' }, { status: 400 })
 
   const pdf = Buffer.from(await file.arrayBuffer()).toString('base64')
 
@@ -52,21 +70,28 @@ containing the first class is Week 1.`
     : `This course is organized BY DATE. For every item set "due_date" as
 YYYY-MM-DD. If no year is given, assume ${new Date().getFullYear()}.`
 
+  const { ok, json } = await callGemini({
+    contents: [{
+      role: 'user',
+      parts: [
+        { inline_data: { mime_type: 'application/pdf', data: pdf } },
+        { text: `Extract every graded item and required reading from this syllabus.\n${rules}` },
+      ],
+    }],
+    generationConfig: { responseMimeType: 'application/json', responseSchema: schema },
+  })
+
+  if (!ok) {
+    return NextResponse.json(
+      { error: json.error?.message ?? 'Gemini request failed' },
+      { status: 500 })
+  }
+
+  const parts = json.candidates?.[0]?.content?.parts ?? []
+  const text = parts.map((p: { text?: string }) => p.text ?? '').join('')
   try {
-    const res = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
-      contents: [{
-        role: 'user',
-        parts: [
-          { inlineData: { mimeType: 'application/pdf', data: pdf } },
-          { text: `Extract every graded item and required reading from this syllabus.\n${rules}` },
-        ],
-      }],
-      config: { responseMimeType: 'application/json', responseSchema: schema },
-    })
-    return NextResponse.json(JSON.parse(res.text ?? '{"items":[]}'))
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'AI request failed'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(JSON.parse(text || '{"items":[]}'))
+  } catch {
+    return NextResponse.json({ error: 'AI returned invalid JSON' }, { status: 500 })
   }
 }

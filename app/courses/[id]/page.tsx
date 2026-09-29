@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import ItemForm from '@/components/ItemForm'
 import { dueDate, formatDay } from '@/lib/dates'
 import type { Course, Item } from '@/lib/types'
+import SyllabusImport from '@/components/SyllabusImport'
+
 
 export default function CoursePage() {
   const { id } = useParams<{ id: string }>()
@@ -68,6 +70,7 @@ export default function CoursePage() {
           )
         })}
       </ul>
+                 <SyllabusImport course={course} onSaved={load} />
       <ItemForm course={course} onSaved={load} />
     </main>
   )
