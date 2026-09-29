@@ -41,12 +41,13 @@ export async function POST() {
   const feed = await fetch(settings.canvas_feed_url)
   if (!feed.ok)
     return NextResponse.json({ error: 'Could not download the Canvas feed' }, { status: 400 })
-  const events = Object.values(ical.sync.parseICS(await feed.text()))
+  type IcsEvent = { type?: string; uid?: string; start?: Date & { dateOnly?: boolean }; summary?: unknown }
+  const events = Object.values(ical.sync.parseICS(await feed.text())) as unknown as IcsEvent[]
 
   // 1. Pull out assignments (skipping anything before the semester start)
   const assignments = events.flatMap((ev) => {
-    if (ev.type !== 'VEVENT' || !String(ev.uid).includes('assignment') || !ev.start) return []
-    const start = ev.start as Date & { dateOnly?: boolean }
+    if (!ev || ev.type !== 'VEVENT' || !String(ev.uid).includes('assignment') || !ev.start) return []
+    const start = ev.start
     const dueKey = start.dateOnly ? start.toISOString().slice(0, 10) : localDate(start)
     if (settings.semester_start && dueKey < settings.semester_start) return []
     const summary = text(ev.summary)
