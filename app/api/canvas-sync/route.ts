@@ -20,6 +20,14 @@ function localTime(d: Date) {
 const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
 const text = (v: unknown) =>
   typeof v === 'string' ? v : ((v as { val?: string })?.val ?? '')
+const COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#f97316']
+
+// "FA26-POLS-30101-CX-01" -> "POLS 30101"
+function codeFromLabel(label: string) {
+  const m = label.match(/([A-Z]{2,5})-(\d{5})/)
+  return m ? `${m[1]} ${m[2]}` : null
+}
+
 export async function POST() {
   const supabase = await createServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
@@ -35,17 +43,44 @@ export async function POST() {
     return NextResponse.json({ error: 'Could not download the Canvas feed' }, { status: 400 })
   const events = Object.values(ical.sync.parseICS(await feed.text()))
 
-  const { data: courses } = await supabase.from('courses').select('id, code')
+  // 1. Pull out just the assignments
+  const assignments = events.flatMap((ev) => {
+    if (ev.type !== 'VEVENT' || !String(ev.uid).includes('assignment')) return []
+    const summary = text(ev.summary)
+    return [{
+      ev,
+      label: summary.match(/\[([^\]]+)\]\s*$/)?.[1] ?? '',
+      title: summary.replace(/\s*\[[^\]]+\]\s*$/, ''),
+    }]
+  })
+
+  // 2. Create any courses we don't have yet
+  const { data: existing } = await supabase.from('courses').select('id, code')
+  const courses = existing ?? []
+  const findCourse = (label: string) =>
+    courses.find((c) => c.code && norm(label).includes(norm(c.code)))
+
+  const created: string[] = []
+  for (const label of new Set(assignments.map((a) => a.label))) {
+    const code = codeFromLabel(label)
+    if (!code || findCourse(label)) continue
+    const { data, error } = await supabase.from('courses').insert({
+      user_id: user.id,
+      name: code,
+      code,
+      schedule_mode: 'date',
+      color: COLORS[courses.length % COLORS.length],
+    }).select('id, code').single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    courses.push(data)
+    created.push(code)
+  }
+
+  // 3. Turn assignments into planner items
   const rows = []
   const unmatched = new Set<string>()
-
-  for (const ev of events) {
-    if (ev.type !== 'VEVENT' || !String(ev.uid).includes('assignment')) continue
-    const summary = text(ev.summary)
-    const label = summary.match(/\[([^\]]+)\]\s*$/)?.[1] ?? ''
-    const title = summary.replace(/\s*\[[^\]]+\]\s*$/, '')
-    const course = (courses ?? []).find(
-      (c) => c.code && norm(label).includes(norm(c.code)))
+  for (const { ev, label, title } of assignments) {
+    const course = findCourse(label)
     if (!course) {
       if (label) unmatched.add(label)
       continue
@@ -69,5 +104,5 @@ export async function POST() {
       .from('items').upsert(rows, { onConflict: 'user_id,external_id' })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
-  return NextResponse.json({ synced: rows.length, unmatched: [...unmatched] })
+  return NextResponse.json({ synced: rows.length, created, unmatched: [...unmatched] })
 }
