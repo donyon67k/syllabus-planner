@@ -19,4 +19,6 @@ export type Item = {
   status: 'todo' | 'done'
   source: string
   notes: string | null
+    priority: 'normal' | 'high'
+  weight: number | null
 }

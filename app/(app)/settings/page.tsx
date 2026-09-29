@@ -37,6 +37,7 @@ export default function SettingsPage() {
     setBusy(false)
     if (!res.ok) return setStatus('Error: ' + json.error)
     let msg = `Synced ${json.synced} assignments.`
+    if (json.created?.length) msg += ` Created courses: ${json.created.join(', ')}.`
     if (json.unmatched.length)
       msg += ` Not matched to any course: ${json.unmatched.join(' · ')}`
     setStatus(msg)
