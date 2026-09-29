@@ -6,6 +6,7 @@ import ItemRow from '@/components/app/ItemRow'
 import { NextExamCard, WeekLoadCard } from '@/components/app/TodayCards'
 import { addDays, startOfWeek, toISO } from '@/lib/dates'
 import { usePlanner } from '@/lib/usePlanner'
+import AskBar from '@/components/app/AskBar'
 
 export default function TodayPage() {
   const { items, loading, toggle } = usePlanner()
@@ -48,6 +49,7 @@ export default function TodayPage() {
           </Button>
         }
       />
+            <AskBar items={items} />
 
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_330px]">
         <div className="flex flex-col gap-6">

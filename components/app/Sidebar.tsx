@@ -12,11 +12,11 @@ import { CourseDot, cx } from '@/components/ui'
 // Sidebar links, in order. Add, remove or rename here.
 const NAV = [
   { href: '/today', label: 'Today', icon: Sun },
-  { href: '/week', label: 'Week', icon: CalendarDays },
-  { href: '/month', label: 'Month', icon: Calendar },
+  { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/courses', label: 'Courses', icon: BookOpen },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
+
 
 type SidebarCourse = { id: string; code: string | null; name: string; color: string }
 

@@ -3,6 +3,7 @@ import ical from 'node-ical'
 import { createServerSupabase } from '@/lib/supabase/server'
 
 const TIMEZONE = 'America/Indiana/Indianapolis'
+const COLORS = ['#297045', '#006DAA', '#FFB17A', '#73E2A7', '#C2573A', '#7A5CA8', '#3A8F8A', '#B08D57']
 
 // Canvas stores due times in UTC; convert to your local date and time
 function localDate(d: Date) {
@@ -20,7 +21,6 @@ function localTime(d: Date) {
 const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
 const text = (v: unknown) =>
   typeof v === 'string' ? v : ((v as { val?: string })?.val ?? '')
-const COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#f97316']
 
 // "FA26-POLS-30101-CX-01" -> "POLS 30101"
 function codeFromLabel(label: string) {
@@ -34,7 +34,7 @@ export async function POST() {
   if (!user) return NextResponse.json({ error: 'Not logged in' }, { status: 401 })
 
   const { data: settings } = await supabase
-    .from('user_settings').select('canvas_feed_url').maybeSingle()
+    .from('user_settings').select('canvas_feed_url, semester_start').maybeSingle()
   if (!settings?.canvas_feed_url)
     return NextResponse.json({ error: 'Add your Canvas feed link first' }, { status: 400 })
 
@@ -43,12 +43,17 @@ export async function POST() {
     return NextResponse.json({ error: 'Could not download the Canvas feed' }, { status: 400 })
   const events = Object.values(ical.sync.parseICS(await feed.text()))
 
-  // 1. Pull out just the assignments
+  // 1. Pull out assignments (skipping anything before the semester start)
   const assignments = events.flatMap((ev) => {
-    if (ev.type !== 'VEVENT' || !String(ev.uid).includes('assignment')) return []
+    if (ev.type !== 'VEVENT' || !String(ev.uid).includes('assignment') || !ev.start) return []
+    const start = ev.start as Date & { dateOnly?: boolean }
+    const dueKey = start.dateOnly ? start.toISOString().slice(0, 10) : localDate(start)
+    if (settings.semester_start && dueKey < settings.semester_start) return []
     const summary = text(ev.summary)
     return [{
-      ev,
+      uid: String(ev.uid),
+      start,
+      dueKey,
       label: summary.match(/\[([^\]]+)\]\s*$/)?.[1] ?? '',
       title: summary.replace(/\s*\[[^\]]+\]\s*$/, ''),
     }]
@@ -79,23 +84,22 @@ export async function POST() {
   // 3. Turn assignments into planner items
   const rows = []
   const unmatched = new Set<string>()
-  for (const { ev, label, title } of assignments) {
-    const course = findCourse(label)
+  for (const a of assignments) {
+    const course = findCourse(a.label)
     if (!course) {
-      if (label) unmatched.add(label)
+      if (a.label) unmatched.add(a.label)
       continue
     }
-    const start = ev.start as Date & { dateOnly?: boolean }
     rows.push({
       user_id: user.id,
       course_id: course.id,
-      title,
-      type: /exam|midterm|final/i.test(title) ? 'exam'
-        : /quiz/i.test(title) ? 'quiz' : 'assignment',
-      due_date: start.dateOnly ? start.toISOString().slice(0, 10) : localDate(start),
-      due_time: start.dateOnly ? null : localTime(start),
+      title: a.title,
+      type: /exam|midterm|final/i.test(a.title) ? 'exam'
+        : /quiz/i.test(a.title) ? 'quiz' : 'assignment',
+      due_date: a.dueKey,
+      due_time: a.start.dateOnly ? null : localTime(a.start),
       source: 'canvas',
-      external_id: String(ev.uid),
+      external_id: a.uid,
     })
   }
 

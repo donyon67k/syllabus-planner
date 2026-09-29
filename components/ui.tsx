@@ -12,6 +12,7 @@ const buttonVariants = {
   secondary: 'bg-surface text-text font-semibold border border-border hover:bg-chip',
   ghost: 'text-muted font-medium hover:text-text hover:bg-chip',
   danger: 'text-warm-text font-semibold hover:bg-warm-bg',
+    destructive: 'bg-warm-text text-surface font-bold hover:brightness-110',
 }
 const buttonSizes = {
   sm: 'h-9 px-3 text-sm',
