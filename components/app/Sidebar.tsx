@@ -1,12 +1,13 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { BookOpen, Calendar, CalendarDays, RefreshCw, Settings, Sun } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { COURSES_CHANGED, notifyItemsChanged } from '@/lib/events'
 import { APP_NAME } from '@/design/brand'
-import { CourseDot, cx } from '@/components/ui'
 import LilyPad from '@/components/app/Logo'
+import { CourseDot, cx } from '@/components/ui'
 
 // Sidebar links, in order. Add, remove or rename here.
 const NAV = [
@@ -26,10 +27,16 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const [syncing, setSyncing] = useState(false)
   const [syncNote, setSyncNote] = useState('Tap to sync')
 
-  useEffect(() => {
+  const loadCourses = useCallback(() => {
     supabase.from('courses').select('id, code, name, color').order('code')
       .then(({ data }) => setCourses(data ?? []))
   }, [])
+
+  useEffect(() => {
+    loadCourses()
+    window.addEventListener(COURSES_CHANGED, loadCourses)
+    return () => window.removeEventListener(COURSES_CHANGED, loadCourses)
+  }, [loadCourses])
 
   async function sync() {
     setSyncing(true)
@@ -38,14 +45,15 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     if (!res.ok) return setSyncNote('Sync failed')
     const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     setSyncNote(`Synced at ${time}`)
-    window.location.reload()
+    loadCourses()
+    notifyItemsChanged()
   }
 
   return (
     <div className="flex h-full flex-col gap-7 px-4.5 pb-5 pt-7">
       <div className="flex items-center gap-2.5 px-2.5">
         <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-primary text-on-primary">
-         <LilyPad size={19} />
+          <LilyPad size={19} />
         </div>
         <span className="font-display text-[21px] font-semibold tracking-tight">{APP_NAME}</span>
       </div>
@@ -65,11 +73,12 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </nav>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex min-h-0 flex-col gap-1 overflow-y-auto">
         <p className="px-3 pb-1.5 text-xs font-bold uppercase tracking-[0.08em] text-muted">Courses</p>
         {courses.map((c) => (
           <Link key={c.id} href={`/courses/${c.id}`} onClick={onNavigate}
-            className="flex h-9 items-center gap-3 rounded-[10px] px-3 text-sm font-medium hover:bg-chip">
+            className={cx('flex h-9 shrink-0 items-center gap-3 rounded-[10px] px-3 text-sm font-medium hover:bg-chip',
+              pathname === `/courses/${c.id}` && 'bg-chip')}>
             <CourseDot color={c.color} size={9} />
             <span className="truncate">{c.code ?? c.name}</span>
           </Link>

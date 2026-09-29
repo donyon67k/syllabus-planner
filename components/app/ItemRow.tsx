@@ -17,7 +17,7 @@ export default function ItemRow({ item, onToggle, leading }: {
 
   return (
     <div className="flex items-center gap-3.5 px-4.5 py-3.5">
-      {leading && <span className="w-10 shrink-0 text-[13px] font-bold text-muted">{leading}</span>}
+      {leading && <span className="w-12 shrink-0 text-[13px] font-bold text-muted">{leading}</span>}
       <CheckCircle done={done} onClick={onToggle} />
       <button onClick={() => openItem(item)} className="flex min-w-0 flex-1 flex-col gap-1 text-left">
         <span className={cx('truncate text-[15px] font-semibold', done && 'text-muted line-through')}>

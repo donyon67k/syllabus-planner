@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
+import { FileText, Upload, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Button, Card, Input, SectionLabel, Select } from '@/components/ui'
 import type { Course } from '@/lib/types'
 
 type Draft = { title: string; type: string; week?: number; weekday?: number; due_date?: string }
@@ -19,7 +21,7 @@ export default function SyllabusImport({ course, onSaved }: { course: Course; on
   async function analyze() {
     if (!file) return
     setBusy(true)
-    setStatus('Reading syllabus… this can take up to a minute')
+    setStatus('Reading the syllabus… this can take up to a minute.')
     try {
       const body = new FormData()
       body.append('file', file)
@@ -28,7 +30,7 @@ export default function SyllabusImport({ course, onSaved }: { course: Course; on
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setDrafts(json.items ?? [])
-      setStatus(`Found ${json.items?.length ?? 0} items. Review, then save.`)
+      setStatus(`Found ${json.items?.length ?? 0} items. Check them, then save.`)
     } catch (e) {
       setStatus('Error: ' + (e instanceof Error ? e.message : 'something went wrong'))
     }
@@ -56,63 +58,77 @@ export default function SyllabusImport({ course, onSaved }: { course: Course; on
     if (error) return setStatus('Error: ' + error.message)
     setDrafts(null)
     setFile(null)
-    setStatus(`Saved ${rows.length} items!`)
+    setStatus(`Saved ${rows.length} items.`)
     onSaved()
   }
-    const input = 'rounded border border-gray-600 bg-transparent p-1 text-sm'
+    return (
+    <Card className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <SectionLabel>Import from syllabus</SectionLabel>
+        <p className="text-sm text-muted">Upload the PDF. You review everything before it&apos;s saved.</p>
+      </div>
 
-  return (
-    <div className="space-y-3 rounded-lg border border-gray-700 p-4">
-      <h2 className="text-lg font-semibold">Import from syllabus</h2>
       {!drafts && (
-        <div className="flex flex-wrap items-center gap-2">
-          <input type="file" accept="application/pdf" className="text-sm"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          <button onClick={analyze} disabled={busy || !file}
-            className="rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50">
-            {busy ? 'Reading…' : 'Analyze'}
-          </button>
-        </div>
+        <>
+          <label className="flex cursor-pointer items-center gap-3 rounded-control border border-dashed border-border px-4 py-3.5 hover:bg-chip">
+            <FileText size={18} className="shrink-0 text-muted" />
+            <span className="flex-1 truncate text-sm font-medium">{file ? file.name : 'Choose a PDF'}</span>
+            <input type="file" accept="application/pdf" className="sr-only"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </label>
+          <Button onClick={analyze} disabled={busy || !file}>
+            <Upload size={16} /> {busy ? 'Reading…' : 'Analyze syllabus'}
+          </Button>
+        </>
       )}
-      {status && <p className="text-sm text-gray-400">{status}</p>}
+
+      {status && <p className="text-sm text-muted">{status}</p>}
+
       {drafts && (
         <>
-          <ul className="space-y-2">
+          <div className="flex max-h-[440px] flex-col divide-y divide-divider overflow-y-auto rounded-control border border-border">
             {drafts.map((d, i) => (
-              <li key={i} className="flex flex-wrap items-center gap-2 rounded border border-gray-700 p-2">
-                <input className={`${input} min-w-40 flex-1`} value={d.title}
-                  onChange={(e) => update(i, { title: e.target.value })} />
-                <select className={input} value={d.type} onChange={(e) => update(i, { type: e.target.value })}>
-                  {TYPES.map((t) => <option key={t} value={t} className="bg-black">{t}</option>)}
-                </select>
-                {weekMode ? (
-                  <>
-                    <input type="number" min={1} max={20} className={`${input} w-16`} value={d.week ?? ''}
-                      onChange={(e) => update(i, { week: Number(e.target.value) })} />
-                    <select className={input} value={d.weekday ?? 1}
-                      onChange={(e) => update(i, { weekday: Number(e.target.value) })}>
-                      {WEEKDAYS.map((w, k) => <option key={w} value={k + 1} className="bg-black">{w}</option>)}
-                    </select>
-                  </>
-                ) : (
-                  <input type="date" className={input} value={d.due_date ?? ''}
-                    onChange={(e) => update(i, { due_date: e.target.value })} />
-                )}
-                <button onClick={() => setDrafts(drafts.filter((_, j) => j !== i))}
-                  className="text-sm text-red-400">✕</button>
-              </li>
+              <div key={i} className="flex flex-col gap-2 p-3">
+                <div className="flex gap-2">
+                  <Input aria-label="Title" className="h-9 text-sm" value={d.title}
+                    onChange={(e) => update(i, { title: e.target.value })} />
+                  <button aria-label="Remove item" onClick={() => setDrafts(drafts.filter((_, j) => j !== i))}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-muted hover:bg-chip">
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Select aria-label="Type" className="h-9 text-sm" value={d.type}
+                    onChange={(e) => update(i, { type: e.target.value })}>
+                    {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </Select>
+                  {weekMode ? (
+                    <>
+                      <Select aria-label="Week" className="h-9 text-sm" value={d.week ?? 1}
+                        onChange={(e) => update(i, { week: Number(e.target.value) })}>
+                        {Array.from({ length: 16 }, (_, k) => k + 1).map((w) => (
+                          <option key={w} value={w}>Week {w}</option>
+                        ))}
+                      </Select>
+                      <Select aria-label="Day" className="h-9 text-sm" value={d.weekday ?? 1}
+                        onChange={(e) => update(i, { weekday: Number(e.target.value) })}>
+                        {WEEKDAYS.map((w, k) => <option key={w} value={k + 1}>{w}</option>)}
+                      </Select>
+                    </>
+                  ) : (
+                    <Input aria-label="Due date" type="date" className="col-span-2 h-9 text-sm"
+                      value={d.due_date ?? ''} onChange={(e) => update(i, { due_date: e.target.value })} />
+                  )}
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
           <div className="flex gap-2">
-            <button onClick={saveAll} disabled={busy}
-              className="flex-1 rounded bg-blue-600 p-2 text-white disabled:opacity-50">
-              Save {drafts.length} items
-            </button>
-            <button onClick={() => { setDrafts(null); setStatus('') }}
-              className="rounded border border-gray-600 px-3">Cancel</button>
+            <Button variant="secondary" onClick={() => { setDrafts(null); setStatus('') }}>Cancel</Button>
+            <Button className="flex-1" onClick={saveAll} disabled={busy}>Save {drafts.length} items</Button>
           </div>
         </>
       )}
-    </div>
+    </Card>
   )
 }

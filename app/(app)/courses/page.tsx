@@ -1,50 +1,72 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import CourseForm from '@/components/CourseForm'
-import type { Course } from '@/lib/types'
 import Link from 'next/link'
+import { useState } from 'react'
+import { Plus } from 'lucide-react'
+import { Button, Card, CourseDot, PageHeader } from '@/components/ui'
+import Sheet from '@/components/app/Sheet'
+import CourseForm from '@/components/app/CourseForm'
+import { usePlanner } from '@/lib/usePlanner'
 
 export default function CoursesPage() {
-  const supabase = createClient()
-  const router = useRouter()
-  const [courses, setCourses] = useState<Course[]>([])
+  const { items, courses, loading } = usePlanner()
+  const [adding, setAdding] = useState(false)
 
-  async function load() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return router.push('/login')
-    const { data } = await supabase.from('courses').select('*').order('created_at')
-    setCourses(data ?? [])
-  }
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const sorted = [...courses].sort((a, b) => (a.code ?? a.name).localeCompare(b.code ?? b.name))
 
-  useEffect(() => { load() }, [])
-
-  async function remove(id: string) {
-    if (!confirm('Delete this course and all its items?')) return
-    await supabase.from('courses').delete().eq('id', id)
-    load()
-  }
+  if (loading) return <p className="text-muted">Loading…</p>
 
   return (
-    <main className="mx-auto max-w-xl space-y-6 p-6">
-      <h1 className="text-2xl font-semibold">My Courses</h1>
-            <Link href="/week" className="text-sm text-blue-400">View this week →</Link>
-      <ul className="space-y-2">
-        {courses.map((c) => (
-          <li key={c.id} className="flex items-center gap-3 rounded border border-gray-700 p-3">
-            <span className="h-4 w-4 rounded-full" style={{ background: c.color }} />
-            <div className="flex-1">
-              <Link href={`/courses/${c.id}`} className="font-medium hover:underline">{c.name} {c.code && <span className="text-gray-400">· {c.code}</span>}</Link>
-              <p className="text-xs text-gray-400">
-                {c.schedule_mode === 'week' ? `By week · starts ${c.term_start}` : 'By date'}
-              </p>
-            </div>
-            <button onClick={() => remove(c.id)} className="text-sm text-red-400">Delete</button>
-          </li>
-        ))}
-      </ul>
-      <CourseForm onSaved={load} />
-    </main>
+    <div className="flex flex-col gap-7">
+      <PageHeader
+        title="Courses"
+        subtitle={`${courses.length} ${courses.length === 1 ? 'course' : 'courses'} this semester`}
+        action={
+          <Button onClick={() => setAdding(true)}>
+            <Plus size={16} strokeWidth={2.5} /> New course
+          </Button>
+        }
+      />
+
+      {courses.length === 0 ? (
+        <Card className="text-[15px] text-muted">
+          No courses yet. Add one, or sync Canvas from the sidebar to create them automatically.
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {sorted.map((c) => {
+            const mine = items.filter((i) => i.course_id === c.id)
+            const upcoming = mine.filter((i) => i.date && i.date >= today && i.status !== 'done')
+            const next = upcoming[0]
+            const done = mine.filter((i) => i.status === 'done').length
+            return (
+              <Link key={c.id} href={`/courses/${c.id}`}
+                className="flex min-h-44 flex-col gap-3 rounded-card border border-border bg-surface p-5 transition hover:border-faint">
+                <div className="flex items-center gap-2.5">
+                  <CourseDot color={c.color} size={10} />
+                  <span className="text-sm font-bold text-muted">{c.code ?? 'No code'}</span>
+                </div>
+                <p className="font-display text-2xl font-semibold leading-tight tracking-tight">{c.name}</p>
+                <div className="mt-auto flex flex-col gap-1 text-sm text-muted">
+                  <span className="truncate">
+                    {next
+                      ? `Next: ${next.title} · ${next.date!.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                      : 'Nothing upcoming'}
+                  </span>
+                  <span>
+                    {upcoming.length} upcoming · {done} done · {c.schedule_mode === 'week' ? 'By week' : 'By date'}
+                  </span>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+
+      <Sheet open={adding} onClose={() => setAdding(false)} title="New course">
+        {adding && <CourseForm course={null} onDone={() => setAdding(false)} />}
+      </Sheet>
+    </div>
   )
 }
