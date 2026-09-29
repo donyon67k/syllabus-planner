@@ -3,11 +3,13 @@ import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import Sidebar from './Sidebar'
 import { APP_NAME } from '@/design/brand'
+import { ItemEditorProvider, NewItemFab } from './ItemEditor'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
 
   return (
+    <ItemEditorProvider>
     <div className="flex min-h-screen bg-bg text-text">
       {/* Desktop sidebar */}
       <aside className="hidden w-66 shrink-0 border-r border-border bg-sidebar md:block">
@@ -44,8 +46,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-5 pb-24 pt-4 md:px-14 md:pt-11">
           {children}
-        </main>
+                </main>
       </div>
     </div>
+      <NewItemFab />
+    </ItemEditorProvider>
   )
 }

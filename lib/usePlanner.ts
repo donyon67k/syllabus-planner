@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { dueDate } from '@/lib/dates'
 import type { Course, Item } from '@/lib/types'
+import { ITEMS_CHANGED } from '@/lib/events'
 
 export type PlannerItem = Item & { course: Course; date: Date | null }
 
@@ -35,6 +36,10 @@ export function usePlanner() {
   }, [])
 
   useEffect(() => { load() }, [load])
+    useEffect(() => {
+    window.addEventListener(ITEMS_CHANGED, load)
+    return () => window.removeEventListener(ITEMS_CHANGED, load)
+  }, [load])
 
   // Check/uncheck instantly, then save
   async function toggle(item: PlannerItem) {

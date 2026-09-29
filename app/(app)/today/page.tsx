@@ -1,7 +1,7 @@
 'use client'
-import Link from 'next/link'
 import { Plus } from 'lucide-react'
-import { ListCard, PageHeader, SectionLabel } from '@/components/ui'
+import { Button, ListCard, PageHeader, SectionLabel } from '@/components/ui'
+import { useItemEditor } from '@/components/app/ItemEditor'
 import ItemRow from '@/components/app/ItemRow'
 import { NextExamCard, WeekLoadCard } from '@/components/app/TodayCards'
 import { addDays, startOfWeek, toISO } from '@/lib/dates'
@@ -9,6 +9,7 @@ import { usePlanner } from '@/lib/usePlanner'
 
 export default function TodayPage() {
   const { items, loading, toggle } = usePlanner()
+  const { openItem } = useItemEditor()
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -42,10 +43,9 @@ export default function TodayPage() {
         title={title}
         subtitle={subtitle}
         action={
-          <Link href="/courses"
-            className="hidden h-11 items-center gap-2 rounded-control bg-primary px-5 text-[15px] font-bold text-on-primary hover:brightness-110 md:inline-flex">
+          <Button onClick={() => openItem()} className="hidden md:inline-flex">
             <Plus size={16} strokeWidth={2.5} /> New item
-          </Link>
+          </Button>
         }
       />
 

@@ -63,7 +63,7 @@ export function PageHeader({ title, subtitle, action }: {
   title: ReactNode; subtitle?: ReactNode; action?: ReactNode
 }) {
   return (
-    <div className="flex items-end justify-between gap-6">
+    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
       <div className="flex flex-col gap-2">
         <h1 className="font-display text-4xl font-semibold leading-none tracking-tight md:text-[44px]">
           {title}
@@ -125,5 +125,44 @@ export function CheckCircle({ done, onClick }: { done: boolean; onClick?: () => 
     >
       {done && <Check size={12} strokeWidth={3.5} />}
     </button>
+  )
+}
+/* ---------- FORM PIECES ---------- */
+export function Field({ label, children, hint }: {
+  label: string; children: ReactNode; hint?: string
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[13px] font-semibold text-muted">{label}</span>
+      {children}
+      {hint && <span className="text-xs text-faint">{hint}</span>}
+    </label>
+  )
+}
+
+export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      className={cx('w-full rounded-control border border-border bg-surface px-3.5 py-2.5 text-[15px]',
+        'text-text placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40', className)}
+      {...props}
+    />
+  )
+}
+
+// Pill-style toggle between a few options
+export function Segmented<T extends string>({ value, options, onChange }: {
+  value: T; options: { value: T; label: string }[]; onChange: (v: T) => void
+}) {
+  return (
+    <div className="flex gap-1 rounded-control bg-chip p-1">
+      {options.map((o) => (
+        <button key={o.value} type="button" onClick={() => onChange(o.value)}
+          className={cx('h-9 flex-1 rounded-[9px] text-sm font-semibold transition',
+            value === o.value ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text')}>
+          {o.label}
+        </button>
+      ))}
+    </div>
   )
 }
